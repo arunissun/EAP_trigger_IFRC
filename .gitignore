@@ -1,10 +1,5 @@
-# Data files (large GRIB and NetCDF files)
+# Data files (large GRIB files - raw downloads)
 data/**/*.grib2
-data/**/*.nc           # Exclude ALL NetCDF files (too large)
-
-# But keep these processed files:
-!data/**/*.png          # Keep plot files
-!data/**/return_periods/*.nc  # Keep only return period threshold files
 
 # Python cache
 __pycache__/
