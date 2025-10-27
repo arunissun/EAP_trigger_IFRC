@@ -51,7 +51,7 @@ jobs:
 
       - name: Clean up temporary files
         run: |
-          # Remove downloaded GRIB2 files to save space
+          # Remove downloaded GRIB2 files to save space 
           # Keep only the processed NetCDF files and plots
           find data/ -name "*.grib2" -type f -delete
           echo "Cleaned up GRIB2 files"
