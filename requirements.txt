@@ -1,0 +1,6 @@
+xarray
+netCDF4
+cfgrib
+cdsapi
+numpy
+matplotlib

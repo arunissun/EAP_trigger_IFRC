@@ -1,0 +1,60 @@
+name: GloFAS Daily Pipeline
+
+on:
+  workflow_dispatch:           # allows manual runs from GitHub UI
+  schedule:
+    - cron: '0 6 * * *'        # runs daily at 06:00 UTC
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes-dev
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure CDS API credentials
+        run: |
+          mkdir -p ~/.cdsapirc
+          echo "url: ${{ secrets.CDSAPI_URL }}" > ~/.cdsapirc
+          echo "key: ${{ secrets.CDSAPI_KEY }}" >> ~/.cdsapirc
+        env:
+          CDSAPI_URL: ${{ secrets.CDSAPI_URL }}
+          CDSAPI_KEY: ${{ secrets.CDSAPI_KEY }}
+
+      - name: Download GloFAS Data
+        run: |
+          python scripts/download_glofas.py
+
+      - name: Merge GRIB to NetCDF
+        run: |
+          python scripts/merge_grib_to_nc.py
+
+      - name: Plot Hydrographs
+        run: |
+          python scripts/plot_hydrographs.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/
+          git commit -m "Daily GloFAS data update - $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
