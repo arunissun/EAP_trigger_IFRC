@@ -1,5 +1,7 @@
 # Data files (large GRIB and NetCDF files)
-
+data/**/*.grib2
+data/**/*.nc
+data/**/*.png
 
 # But keep return period threshold files (small reference data)
 !data/**/return_periods/
