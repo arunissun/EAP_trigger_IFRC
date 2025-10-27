@@ -3,7 +3,7 @@ name: GloFAS Daily Pipeline
 on:
   workflow_dispatch:           # allows manual runs from GitHub UI
   schedule:
-    - cron: '0 6 * * *'        # runs daily at 06:00 UTC
+    - cron: '0 13 * * *'       # runs daily at 13:00 UTC
 
 jobs:
   run-pipeline:
