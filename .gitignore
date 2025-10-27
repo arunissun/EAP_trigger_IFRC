@@ -3,6 +3,9 @@ data/**/*.grib2
 data/**/*.nc
 data/**/*.png
 
+# But keep return period threshold files (small reference data)
+!data/**/return_periods/
+
 # Python cache
 __pycache__/
 *.pyc
