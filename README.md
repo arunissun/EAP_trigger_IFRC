@@ -14,20 +14,23 @@ This repository contains a complete automated pipeline that:
 ## Repository Structure
 
 ```
-├── .github/
-│   ├── workflows/
-│   │   └── glofas_daily.yml          # GitHub Actions workflow
-│   ├── GITHUB_ACTIONS_SETUP.md       # Setup instructions
-│   └── SECRETS_QUICK_GUIDE.md        # Secrets configuration guide
 ├── config/
 │   └── countries.py                  # Country configurations
 ├── data/
+│   ├── global_temp/                  # Global temporary data (ignored)
 │   ├── guatemala/
-│   │   ├── ensemble_forecast/        # Downloaded GRIB2 files
-│   │   ├── return_periods/           # Flood threshold files
-│   │   └── plots/                    # Generated hydrographs
-│   └── philippines/                  # Same structure for other countries
+│   │   ├── analysis/                 # Flood trigger analysis CSVs
+│   │   ├── ensemble_forecast/        # Downloaded GRIB2 files and combined NetCDF
+│   │   ├── plots/                    # Generated hydrographs
+│   │   └── return_periods/           # Flood threshold NetCDF files
+│   └── philippines/
+│       ├── analysis/                 # Flood trigger analysis CSVs
+│       ├── ensemble_forecast/        # Downloaded GRIB2 files and combined NetCDF
+│       ├── plots/                    # Generated hydrographs
+│       └── return_periods/           # Flood threshold NetCDF files
 ├── scripts/
+│   ├── analyze_flood_triggers.py     # Flood trigger analysis
+│   ├── crop_return_periods.py        # Crop global return periods to country boundaries
 │   ├── download_glofas.py            # Data download script
 │   ├── merge_grib_to_nc.py           # GRIB to NetCDF conversion
 │   └── plot_hydrographs.py           # Plot generation
@@ -69,6 +72,26 @@ This repository contains a complete automated pipeline that:
    python scripts/merge_grib_to_nc.py
    python scripts/plot_hydrographs.py
    ```
+
+### Crop Return Periods Script
+
+The `crop_return_periods.py` script crops global GloFAS return period data to specific country boundaries for efficient processing.
+
+**Usage:**
+```bash
+python scripts/crop_return_periods.py --country <country_code> --return_period <2_or_5>
+```
+
+**Parameters:**
+- `--country`: Country code (e.g., `guatemala`, `philippines`)
+- `--return_period`: Return period (2 or 5 years)
+
+**Example:**
+```bash
+python scripts/crop_return_periods.py --country guatemala --return_period 2
+```
+
+This generates cropped NetCDF files in `data/{country_code}/return_periods/` for use in flood threshold analysis.
 
 ### GitHub Actions Setup
 
