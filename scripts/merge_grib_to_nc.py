@@ -3,8 +3,12 @@ import glob
 import os
 import sys
 
-# Add config to path
-sys.path.append('config')
+# Add config to path (use absolute path based on script location)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+config_path = os.path.join(project_root, 'config')
+sys.path.insert(0, config_path)
+
 from countries import COUNTRIES
 
 def merge_country_data(country_code):
@@ -100,8 +104,16 @@ def merge_country_data(country_code):
             ds_combined = ds_new
 
         ds_combined = ds_combined.sortby('time')
-        ds_combined.to_netcdf(output_nc)
-        print(f"Merged data for {country_config['name']}, updated monthly NetCDF: {output_nc}")
+        
+        
+        
+        try:
+            ds_combined.to_netcdf(output_nc)
+            print(f"Merged data for {country_config['name']}, updated monthly NetCDF: {output_nc}")
+        except Exception as e:
+            print(f"Error saving NetCDF file {output_nc}: {e}")
+            print("This might be due to file permissions or the file being used by another process.")
+            return
 
 if __name__ == "__main__":
     # Merge data for both countries
