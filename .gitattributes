@@ -1,6 +1,4 @@
 # Track country-specific cropped return period files with Git LFS
 # (Global return period files are ignored - see .gitignore)
 data/**/return_periods/*.nc filter=lfs diff=lfs merge=lfs -text
-
-# Track combined ensemble forecast NetCDF files with Git LFS
-data/**/ensemble_forecast/*_combined.nc filter=lfs diff=lfs merge=lfs -text
+data/*/return_periods/*.nc filter=lfs diff=lfs merge=lfs -text

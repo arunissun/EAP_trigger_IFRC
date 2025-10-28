@@ -1,14 +1,16 @@
 # Data files (large GRIB files - raw downloads)
 data/**/*.grib2
 
-# All data files
-data/
+# Global temp data (kept locally but not tracked)
+data/global_temp/
+
+# Combined ensemble forecast files (too large, kept locally)
+data/**/ensemble_forecast/*_combined.nc
 
 # Global return period files (kept locally but not tracked)
 # Only country-specific cropped files are tracked via Git LFS
 data/global/
 data/return_periods/
-flood_threshold_glofas_v4_rl_*.nc
 
 # Python cache
 __pycache__/
