@@ -4,9 +4,14 @@ import pandas as pd
 import os
 import glob
 import sys
+import re
 
-# Add config to path
-sys.path.append('config')
+# Add config to path (use absolute path based on script location)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+config_path = os.path.join(project_root, 'config')
+sys.path.insert(0, config_path)
+
 from countries import COUNTRIES
 
 def interpolate_return_period(val_2yr, val_5yr, target_rp=3.0):
@@ -51,29 +56,51 @@ def get_return_period_value(ds, lat, lon, varname):
     ilon = np.abs(ds['lon'].values - lon).argmin()
     return ds[varname].values[ilat, ilon], ds['lat'].values[ilat], ds['lon'].values[ilon]
 
-def analyze_flood_triggers(country_code, lead_time_days=3, target_rp=3.0, probability_threshold=0.5):
+def analyze_flood_triggers(country_code, lead_time_days=None, target_rp=None, probability_threshold=None):
     """
     Analyze GloFAS ensemble forecasts for flood trigger conditions.
     
-    This function checks when the ensemble forecast exceeds a specified probability
-    threshold for a given return period at a specific lead time.
+    Supports both single-point (Guatemala) and multi-basin (Philippines) configurations.
+    Uses country-specific trigger settings from COUNTRIES config.
     
     Args:
         country_code: Country code from COUNTRIES config
-        lead_time_days: Lead time to analyze (default 3 days)
-        target_rp: Target return period in years (default 3.0)
-        probability_threshold: Probability threshold for alerts (default 0.5 = 50%)
+        lead_time_days: Lead time to analyze (overrides config if provided)
+        target_rp: Target return period in years (overrides config if provided)
+        probability_threshold: Probability threshold for alerts (overrides config if provided)
     
     Returns:
-        DataFrame with analysis results for all forecast dates
+        Dictionary of DataFrames by month (and by basin for multi-basin countries)
     """
     if country_code not in COUNTRIES:
         print(f"ERROR: Country '{country_code}' not found in configuration")
         return None
     
     country_config = COUNTRIES[country_code]
-    ensemble_folder = f"data/{country_code}/ensemble_forecast"
     
+    # Get trigger parameters from config or use provided overrides
+    trigger_config = country_config.get('trigger', {})
+    lead_time_days = lead_time_days or trigger_config.get('lead_time_days', 3)
+    target_rp = target_rp or trigger_config.get('return_period', 3.0)
+    probability_threshold = probability_threshold or trigger_config.get('probability_threshold', 0.5)
+    
+    # Check if multi-basin configuration (Philippines)
+    if 'river_basins' in country_config:
+        return analyze_multibasin_triggers(
+            country_code, country_config, 
+            lead_time_days, target_rp, probability_threshold
+        )
+    else:
+        # Single-point configuration (Guatemala)
+        return analyze_singlepoint_triggers(
+            country_code, country_config,
+            lead_time_days, target_rp, probability_threshold
+        )
+
+def analyze_singlepoint_triggers(country_code, country_config, lead_time_days, target_rp, probability_threshold):
+    """Analyze triggers for countries with single monitoring point (e.g., Guatemala)."""
+    
+    ensemble_folder = f"data/{country_code}/ensemble_forecast"
     target_lat = country_config["river_coords"]["lat"]
     target_lon = country_config["river_coords"]["lon"]
     
@@ -84,18 +111,13 @@ def analyze_flood_triggers(country_code, lead_time_days=3, target_rp=3.0, probab
     
     if not os.path.exists(rp_file_2yr) or not os.path.exists(rp_file_5yr):
         print(f"ERROR: Return period files not found for {country_code}")
-        print(f"   Expected: {rp_file_2yr}")
-        print(f"   Expected: {rp_file_5yr}")
         return None
     
-    # Load and interpolate return periods
     ds_2yr = xr.open_dataset(rp_file_2yr)
     ds_5yr = xr.open_dataset(rp_file_5yr)
     
     val_2yr, grid_lat, grid_lon = get_return_period_value(ds_2yr, target_lat, target_lon, 'rl_2.0')
     val_5yr, _, _ = get_return_period_value(ds_5yr, target_lat, target_lon, 'rl_5.0')
-    
-    # Interpolate target return period (3-year)
     val_target_rp = interpolate_return_period(val_2yr, val_5yr, target_rp=target_rp)
     
     print(f"\n{'='*70}")
@@ -104,10 +126,11 @@ def analyze_flood_triggers(country_code, lead_time_days=3, target_rp=3.0, probab
     print(f"Location: Lat {grid_lat:.3f}, Lon {grid_lon:.3f}")
     print(f"Return Period Thresholds:")
     print(f"   - 2-year RP:  {val_2yr:.2f} m3/s")
-    print(f"   - 3-year RP:  {val_target_rp:.2f} m3/s (interpolated)")
+    print(f"   - {target_rp}-year RP:  {val_target_rp:.2f} m3/s (interpolated)")
     print(f"   - 5-year RP:  {val_5yr:.2f} m3/s")
     print(f"Lead time:   {lead_time_days} days")
     print(f"Alert threshold: {probability_threshold*100:.0f}% probability")
+    print(f"{'='*70}\n")
     print(f"{'='*70}\n")
     
     # Find all ensemble NetCDF files
@@ -242,9 +265,177 @@ def analyze_flood_triggers(country_code, lead_time_days=3, target_rp=3.0, probab
     
     return dfs_by_month
 
-def save_results(df, country_code, year_month, lead_time_days=3, target_rp=3.0):
+def analyze_multibasin_triggers(country_code, country_config, lead_time_days, target_rp, probability_threshold):
+    """
+    Analyze triggers for countries with multiple river basins (e.g., Philippines).
+    
+    EAP activates if ANY basin meets the threshold.
+    """
+    ensemble_folder = f"data/{country_code}/ensemble_forecast"
+    
+    # Load return period data
+    rp_folder = f"data/{country_code}/return_periods"
+    rp_file_2yr = os.path.join(rp_folder, "flood_threshold_glofas_v4_rl_2.0.nc")
+    rp_file_5yr = os.path.join(rp_folder, "flood_threshold_glofas_v4_rl_5.0.nc")
+    
+    if not os.path.exists(rp_file_2yr) or not os.path.exists(rp_file_5yr):
+        print(f"ERROR: Return period files not found for {country_code}")
+        return None
+    
+    ds_2yr = xr.open_dataset(rp_file_2yr)
+    ds_5yr = xr.open_dataset(rp_file_5yr)
+    
+    print(f"\n{'='*70}")
+    print(f"MULTI-BASIN FLOOD TRIGGER ANALYSIS: {country_config['name']}")
+    print(f"{'='*70}")
+    print(f"Trigger Criteria:")
+    print(f"   - Return Period: {target_rp}-year")
+    print(f"   - Probability Threshold: {probability_threshold*100:.0f}%")
+    print(f"   - Lead Time: {lead_time_days} days")
+    print(f"   - Activation Rule: {country_config['trigger'].get('activation_rule', 'ANY_BASIN')}")
+    print(f"   - Number of Basins: {len(country_config['river_basins'])}")
+    print(f"{'='*70}\n")
+    
+    # Store results for each basin
+    all_basins_results = {}
+    
+    for basin_code, basin_config in country_config['river_basins'].items():
+        print(f"\n>>> Analyzing: {basin_config['name']}")
+        print(f"    Station: {basin_config['station_name']} ({basin_config['station_id']})")
+        print(f"    Provinces: {', '.join(basin_config['provinces'])}")
+        
+        target_lat = basin_config['river_coords']['lat']
+        target_lon = basin_config['river_coords']['lon']
+
+        # Get thresholds for this basin
+        val_2yr, grid_lat, grid_lon = get_return_period_value(ds_2yr, target_lat, target_lon, 'rl_2.0')
+        val_5yr, _, _ = get_return_period_value(ds_5yr, target_lat, target_lon, 'rl_5.0')
+        val_target_rp = interpolate_return_period(val_2yr, val_5yr, target_rp=target_rp)
+        
+        print(f"    Location: Lat {grid_lat:.3f}, Lon {grid_lon:.3f}")
+        print(f"    Thresholds: 2yr={val_2yr:.1f}, {target_rp}yr={val_target_rp:.1f}, 5yr={val_5yr:.1f} m3/s")
+        
+        # Find ensemble files
+        nc_pattern = os.path.join(ensemble_folder, f"glofas_{country_code}_ensemble_*_combined.nc")
+        nc_files = sorted(glob.glob(nc_pattern))
+        
+        if not nc_files:
+            print(f"    WARNING: No ensemble files found")
+            continue
+        
+        results_by_month = {}
+        
+        for nc_file in nc_files:
+            filename = os.path.basename(nc_file)
+            match = re.search(r'ensemble_(\d{4})_(\d{2})_combined\.nc', filename)
+            if not match:
+                continue
+            
+            year, month = match.groups()
+            year_month = f"{year}_{month}"
+            
+            if year_month not in results_by_month:
+                results_by_month[year_month] = []
+            
+            ds = xr.open_dataset(nc_file)
+            
+            # Find nearest grid point
+            ilat = np.abs(ds.latitude.values - target_lat).argmin()
+            ilon = np.abs(ds.longitude.values - target_lon).argmin()
+            
+            # Get discharge data
+            discharge_data = ds.dis24.isel(latitude=ilat, longitude=ilon).values
+            lead_times_days_array = ds.step.values.astype('timedelta64[D]').astype(int)
+            
+            if lead_time_days not in lead_times_days_array:
+                print(f"    WARNING: {lead_time_days}-day lead time not available")
+                ds.close()
+                continue
+            
+            lead_idx = np.where(lead_times_days_array == lead_time_days)[0][0]
+            dates = ds.time.values.astype('datetime64[D]').astype(str)
+            
+            # Analyze each date
+            for t in range(discharge_data.shape[0]):
+                ensemble_values = discharge_data[t, :, lead_idx]
+                valid_ensemble = ensemble_values[~np.isnan(ensemble_values)]
+                
+                if len(valid_ensemble) == 0:
+                    continue
+                
+                # Calculate statistics
+                total_members = len(valid_ensemble)
+                exceeding_members = np.sum(valid_ensemble > val_target_rp)
+                probability = exceeding_members / total_members
+                
+                median_discharge = np.median(valid_ensemble)
+                mean_discharge = np.mean(valid_ensemble)
+                min_discharge = np.min(valid_ensemble)
+                max_discharge = np.max(valid_ensemble)
+                p25_discharge = np.percentile(valid_ensemble, 25)
+                p75_discharge = np.percentile(valid_ensemble, 75)
+                
+                median_exceeds = median_discharge > val_target_rp
+                median_exceedance_pct = ((median_discharge / val_target_rp) - 1) * 100
+                
+                alert_status = "HIGH" if probability >= probability_threshold else "MODERATE" if probability >= 0.5 else "LOW"
+                
+                # Store results
+                results_by_month[year_month].append({
+                    'country': country_config['name'],
+                    'country_code': country_code,
+                    'forecast_date': dates[t],
+                    'lead_time_days': lead_time_days,
+                    'latitude': ds.latitude.values[ilat],
+                    'longitude': ds.longitude.values[ilon],
+                    'threshold_rp_years': target_rp,
+                    'threshold_discharge_m3s': val_target_rp,
+                    'exceedance_probability': probability,
+                    'exceeding_members': exceeding_members,
+                    'total_members': total_members,
+                    'median_discharge_m3s': median_discharge,
+                    'mean_discharge_m3s': mean_discharge,
+                    'min_discharge_m3s': min_discharge,
+                    'max_discharge_m3s': max_discharge,
+                    'p25_discharge_m3s': p25_discharge,
+                    'p75_discharge_m3s': p75_discharge,
+                    'median_exceeds_threshold': median_exceeds,
+                    'median_exceedance_pct': median_exceedance_pct,
+                    'alert_status': alert_status,
+                    'threshold_2yr_m3s': val_2yr,
+                    'threshold_5yr_m3s': val_5yr
+                })
+            
+            ds.close()
+        
+        # Convert to DataFrames by month for this basin
+        if results_by_month:
+            basin_dfs_by_month = {}
+            for year_month, results in results_by_month.items():
+                df = pd.DataFrame(results)
+                df = df.sort_values('forecast_date').reset_index(drop=True)
+                basin_dfs_by_month[year_month] = df
+            
+            all_basins_results[basin_code] = basin_dfs_by_month
+    
+    ds_2yr.close()
+    ds_5yr.close()
+    
+    if not all_basins_results:
+        print(f"\nERROR: No results generated for any basin")
+        return None
+    
+    return all_basins_results
+
+def save_results(df, country_code, year_month, lead_time_days=3, target_rp=3.0, basin_code=None):
     """
     Save analysis results to CSV file (monthly).
+    
+    For multi-basin countries, saves separate CSV per basin.
+    
+    File structure: data/{country}/analysis/flood_trigger_analysis_{year}_{month}_{rp}yr_lead{days}d.csv
+                    data/{country}/analysis/{basin}/flood_trigger_analysis_{year}_{month}_{rp}yr_lead{days}d.csv
+```
     
     File structure: data/{country}/analysis/flood_trigger_analysis_{year}_{month}_{rp}yr_lead{days}d.csv
     
@@ -259,14 +450,20 @@ def save_results(df, country_code, year_month, lead_time_days=3, target_rp=3.0):
         print(f"WARNING: No data to save for {country_code}")
         return
     
-    # Create output directory: country/analysis/
-    output_dir = os.path.join("data", country_code, "analysis")
+    # Create output directory: country/analysis/ or country/analysis/basin/ for multi-basin
+    if basin_code:
+        output_dir = os.path.join("data", country_code, "analysis", basin_code)
+        basin_label = f"_{basin_code}"
+    else:
+        output_dir = os.path.join("data", country_code, "analysis")
+        basin_label = ""
+    
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate filename with year_month in the name
     output_file = os.path.join(
         output_dir, 
-        f"flood_trigger_analysis_{year_month}_{int(target_rp)}yr_lead{lead_time_days}d.csv"
+        f"flood_trigger_analysis_{year_month}_{int(target_rp)}yr_lead{lead_time_days}d{basin_label}.csv"
     )
     
     # Check if file exists and merge with existing data
@@ -343,30 +540,40 @@ def main():
     print("Analyzing ensemble forecasts for flood risk conditions")
     print("="*70 + "\n")
     
-    # Configuration
-    LEAD_TIME_DAYS = 3
-    TARGET_RETURN_PERIOD = 3.0
-    PROBABILITY_THRESHOLD = 0.5
-    
-    # Analyze all configured countries
+    # Analyze all configured countries (uses country-specific trigger settings from config)
     for country_code in COUNTRIES.keys():
-        dfs_by_month = analyze_flood_triggers(
-            country_code=country_code,
-            lead_time_days=LEAD_TIME_DAYS,
-            target_rp=TARGET_RETURN_PERIOD,
-            probability_threshold=PROBABILITY_THRESHOLD
-        )
+        results = analyze_flood_triggers(country_code=country_code)
         
-        if dfs_by_month is not None:
-            # Save each month's results separately
-            for year_month, df in dfs_by_month.items():
-                save_results(
-                    df=df,
-                    country_code=country_code,
-                    year_month=year_month,
-                    lead_time_days=LEAD_TIME_DAYS,
-                    target_rp=TARGET_RETURN_PERIOD
-                )
+        if results is not None:
+            country_config = COUNTRIES[country_code]
+            trigger_config = country_config.get('trigger', {})
+            lead_time = trigger_config.get('lead_time_days', 3)
+            target_rp = trigger_config.get('return_period', 3.0)
+            
+            # Check if multi-basin (Philippines) or single-point (Guatemala)
+            if 'river_basins' in country_config:
+                # Multi-basin: results = {basin_code: {year_month: df}}
+                for basin_code, basin_dfs_by_month in results.items():
+                    print(f"\nSaving results for {basin_code} basin...")
+                    for year_month, df in basin_dfs_by_month.items():
+                        save_results(
+                            df=df,
+                            country_code=country_code,
+                            year_month=year_month,
+                            lead_time_days=lead_time,
+                            target_rp=target_rp,
+                            basin_code=basin_code
+                        )
+            else:
+                # Single-point: results = {year_month: df}
+                for year_month, df in results.items():
+                    save_results(
+                        df=df,
+                        country_code=country_code,
+                        year_month=year_month,
+                        lead_time_days=lead_time,
+                        target_rp=target_rp
+                    )
     
     print("\n" + "="*70)
     print("ANALYSIS COMPLETE")
