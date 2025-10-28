@@ -4,8 +4,13 @@ import os
 import sys
 from datetime import datetime
 
-# Add config to path
-sys.path.append('config')
+# Add config to path (use absolute path based on script location)
+import os
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+config_path = os.path.join(project_root, 'config')
+sys.path.insert(0, config_path)
+
 from countries import COUNTRIES
 
 def download_country_data(country_code):
