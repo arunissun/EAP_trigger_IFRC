@@ -105,16 +105,55 @@ The pipeline runs automatically via GitHub Actions. See `.github/GITHUB_ACTIONS_
 
 ### Adding New Countries
 
-Edit `config/countries.py` to add new countries:
+Edit `config/countries.py` to add new countries. The structure varies by country:
 
+**For simple countries (like Guatemala):**
 ```python
 COUNTRIES = {
     "country_code": {
         "name": "Country Name",
-        "bbox": [min_lon, min_lat, max_lon, max_lat],  # Bounding box
+        "bbox": [north, west, south, east],  # Bounding box coordinates
         "river_coords": {
             "lat": latitude,
             "lon": longitude
+        },
+        "trigger": {
+            "return_period": 3.0,  # Return period in years
+            "probability_threshold": 0.5,  # Probability threshold (0-1)
+            "lead_time_days": 3
+        }
+    }
+}
+```
+
+**For countries with multiple river basins (like Philippines):**
+```python
+COUNTRIES = {
+    "country_code": {
+        "name": "Country Name",
+        "bbox": [north, west, south, east],  # Country bounding box
+        "river_basins": {
+            "basin_code": {
+                "name": "Basin Name",
+                "station_name": "Station Name",
+                "station_id": "GXXXX",
+                "river_coords": {
+                    "lat": latitude,
+                    "lon": longitude
+                },
+                "lisflood_coords": {
+                    "lat": latitude,
+                    "lon": longitude
+                },
+                "drainage_area_km2": area,
+                "provinces": ["Province1", "Province2"]
+            }
+        },
+        "trigger": {
+            "return_period": 5.0,
+            "probability_threshold": 0.7,
+            "lead_time_days": 3,
+            "activation_rule": "ANY_BASIN"  # or "ALL_BASINS"
         }
     }
 }
