@@ -7,6 +7,10 @@ COUNTRIES = {
             "lat": 14.211,
             "lon": -90.341
         },
+        "lisflood_coords": {
+            "lat": 14.225,
+            "lon": -90.325
+        },
         "trigger": {
             "return_period": 3.0,  # 3-year return period
             "probability_threshold": 0.5,  # 50% probability
@@ -75,7 +79,20 @@ COUNTRIES = {
                     "lon": 125.575
                 },
                 "drainage_area_km2": 11514,
-                "provinces": ["Agusan del Norte", "Agusan del Sur", "Compostela Valley"]
+                "provinces": ["Agusan del Norte", "Agusan del Sur", "Compostela Valley"],
+                "secondary_station": {
+                    "station_name": "Talacogon Municipal Hall",
+                    "station_id": "G4945",
+                    "river_coords": {
+                        "lat": 8.449,
+                        "lon": 125.785
+                    },
+                    "lisflood_coords": {
+                        "lat": 8.425,
+                        "lon": 125.775
+                    },
+                    "drainage_area_km2": 7862
+                }
             }
         },
         "trigger": {
