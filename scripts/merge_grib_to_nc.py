@@ -25,12 +25,7 @@ def merge_country_data(country_code):
         print(f"No GRIB2 files found for {country_config['name']}, nothing to merge.")
         return
 
-    # Remove .idx files
-    for idx_file in glob.glob(os.path.join(folder, "*.idx")):
-        try:
-            os.remove(idx_file)
-        except Exception:
-            pass
+    
 
     # Sort files by year-month for monthly NetCDF creation
     files_by_month = {}
@@ -55,12 +50,18 @@ def merge_country_data(country_code):
         output_nc = os.path.join(folder, f"glofas_{country_code}_ensemble_{year_month}_combined.nc")
 
         # Get already-merged days
+        ds_old = None
+        old_days = set()
+        
         if os.path.exists(output_nc):
-            ds_old = xr.open_dataset(output_nc)
-            old_days = set(ds_old.time.values.astype('datetime64[D]').astype(str))
-        else:
-            ds_old = None
-            old_days = set()
+            try:
+                ds_old = xr.open_dataset(output_nc)
+                old_days = set(ds_old.time.values.astype('datetime64[D]').astype(str))
+            except Exception as e:
+                print(f"Warning: Could not read existing file {output_nc}: {e}")
+                print("Will overwrite the file.")
+                ds_old = None
+                old_days = set()
 
         # Find new files
         new_files = []
@@ -100,19 +101,37 @@ def merge_country_data(country_code):
         # Combine and save
         if ds_old is not None:
             ds_combined = xr.concat([ds_old, ds_new], dim='time')
+            ds_old.close()  # Close the old dataset
         else:
             ds_combined = ds_new
 
         ds_combined = ds_combined.sortby('time')
         
+        # Close the new dataset
+        ds_new.close()
         
+        # Save to a temporary file first, then rename to avoid permission issues
+        import tempfile
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.nc', dir=os.path.dirname(output_nc))
+        os.close(temp_fd)  # Close the file descriptor
         
         try:
-            ds_combined.to_netcdf(output_nc)
+            ds_combined.to_netcdf(temp_path)
+            ds_combined.close()  # Close the combined dataset
+            
+            # Now move the temp file to the final location
+            if os.path.exists(output_nc):
+                os.remove(output_nc)  # Remove the old file
+            os.rename(temp_path, output_nc)
+            
             print(f"Merged data for {country_config['name']}, updated monthly NetCDF: {output_nc}")
         except Exception as e:
+            # Clean up temp file if something went wrong
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
             print(f"Error saving NetCDF file {output_nc}: {e}")
             print("This might be due to file permissions or the file being used by another process.")
+            ds_combined.close()  # Make sure to close the dataset
             return
 
 if __name__ == "__main__":
