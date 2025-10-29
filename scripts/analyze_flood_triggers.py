@@ -82,7 +82,12 @@ def analyze_flood_triggers(country_code, lead_time_days=None, target_rp=None, pr
     trigger_config = country_config.get('trigger', {})
     lead_time_days = lead_time_days or trigger_config.get('lead_time_days', 3)
     target_rp = target_rp or trigger_config.get('return_period', 3.0)
-    probability_threshold = probability_threshold or trigger_config.get('probability_threshold', 0.5)
+    
+    # Require probability_threshold from config or override; no default
+    if probability_threshold is None:
+        probability_threshold = trigger_config.get('probability_threshold')
+        if probability_threshold is None:
+            raise ValueError(f"ERROR: No probability_threshold found in config for {country_code}. Provide as override.")
     
     # Check if multi-basin configuration (Philippines)
     if 'river_basins' in country_config:
