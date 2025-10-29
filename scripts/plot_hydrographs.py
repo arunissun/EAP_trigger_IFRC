@@ -46,8 +46,8 @@ def plot_single_point_hydrographs(country_code, country_config):
     if not nc_files:
         print(f"No files found")
         return
-    target_lat = country_config["river_coords"]["lat"]
-    target_lon = country_config["river_coords"]["lon"]
+    target_lat = country_config["lisflood_coords"]["lat"]
+    target_lon = country_config["lisflood_coords"]["lon"]
     rp_folder = f"data/{country_code}/return_periods"
     rp_file_2yr = os.path.join(rp_folder, "flood_threshold_glofas_v4_rl_2.0.nc")
     rp_file_5yr = os.path.join(rp_folder, "flood_threshold_glofas_v4_rl_5.0.nc")
@@ -72,8 +72,8 @@ def plot_basin_hydrographs(country_code, country_config, basin_code, basin_confi
     if not nc_files:
         print("No files found")
         return
-    target_lat = basin_config["river_coords"]["lat"]
-    target_lon = basin_config["river_coords"]["lon"]
+    target_lat = basin_config["lisflood_coords"]["lat"]
+    target_lon = basin_config["lisflood_coords"]["lon"]
     rp_folder = f"data/{country_code}/return_periods"
     rp_file_5yr = os.path.join(rp_folder, "flood_threshold_glofas_v4_rl_5.0.nc")
     if not os.path.exists(rp_file_5yr):

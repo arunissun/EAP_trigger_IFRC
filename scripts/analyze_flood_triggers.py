@@ -106,8 +106,8 @@ def analyze_singlepoint_triggers(country_code, country_config, lead_time_days, t
     """Analyze triggers for countries with single monitoring point (e.g., Guatemala)."""
     
     ensemble_folder = f"data/{country_code}/ensemble_forecast"
-    target_lat = country_config["river_coords"]["lat"]
-    target_lon = country_config["river_coords"]["lon"]
+    target_lat = country_config["lisflood_coords"]["lat"]
+    target_lon = country_config["lisflood_coords"]["lon"]
     
     # Load return period data
     rp_folder = f"data/{country_code}/return_periods"
@@ -309,8 +309,8 @@ def analyze_multibasin_triggers(country_code, country_config, lead_time_days, ta
         print(f"    Station: {basin_config['station_name']} ({basin_config['station_id']})")
         print(f"    Provinces: {', '.join(basin_config['provinces'])}")
         
-        target_lat = basin_config['river_coords']['lat']
-        target_lon = basin_config['river_coords']['lon']
+        target_lat = basin_config['lisflood_coords']['lat']
+        target_lon = basin_config['lisflood_coords']['lon']
 
         # Get thresholds for this basin
         val_2yr, grid_lat, grid_lon = get_return_period_value(ds_2yr, target_lat, target_lon, 'rl_2.0')
