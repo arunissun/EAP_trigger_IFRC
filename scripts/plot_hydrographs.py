@@ -75,14 +75,32 @@ def plot_basin_hydrographs(country_code, country_config, basin_code, basin_confi
     target_lat = basin_config["lisflood_coords"]["lat"]
     target_lon = basin_config["lisflood_coords"]["lon"]
     rp_folder = f"data/{country_code}/return_periods"
+    rp_file_2yr = os.path.join(rp_folder, "flood_threshold_glofas_v4_rl_2.0.nc")
     rp_file_5yr = os.path.join(rp_folder, "flood_threshold_glofas_v4_rl_5.0.nc")
-    if not os.path.exists(rp_file_5yr):
-        print("Return period file not found")
+    
+    if not os.path.exists(rp_file_2yr) or not os.path.exists(rp_file_5yr):
+        print("Return period files not found")
         return
+    
+    # Get trigger config to determine return period
+    trigger_config = country_config.get('trigger', {})
+    target_rp = trigger_config.get('return_period', 3.0)
+    
+    ds_2yr = xr.open_dataset(rp_file_2yr)
     ds_5yr = xr.open_dataset(rp_file_5yr)
-    val_5yr, grid_lat, grid_lon = get_return_period_value(ds_5yr, target_lat, target_lon, 'rl_5.0')
-    print(f"Threshold: 5yr={val_5yr:.2f} m3/s")
-    plot_hydrographs_for_location(nc_files, plots_root, target_lat, target_lon, val_5yr, None, basin_config, "philippines", basin_code)
+    
+    val_2yr, grid_lat, grid_lon = get_return_period_value(ds_2yr, target_lat, target_lon, 'rl_2.0')
+    val_5yr, _, _ = get_return_period_value(ds_5yr, target_lat, target_lon, 'rl_5.0')
+    val_target_rp = interpolate_return_period(val_2yr, val_5yr, target_rp=target_rp)
+    
+    print(f"Thresholds: 2yr={val_2yr:.2f}, {target_rp}yr={val_target_rp:.2f}, 5yr={val_5yr:.2f} m3/s")
+    
+    # Determine threshold type based on country
+    threshold_type = "guatemala" if country_code == "guatemala" else "philippines"
+    
+    plot_hydrographs_for_location(nc_files, plots_root, target_lat, target_lon, val_2yr, val_target_rp, basin_config, threshold_type, basin_code)
+    
+    ds_2yr.close()
     ds_5yr.close()
 
 def plot_hydrographs_for_location(nc_files, plots_root, target_lat, target_lon, threshold1, threshold2, config, threshold_type, basin_code=None):
@@ -112,46 +130,41 @@ def plot_hydrographs_for_location(nc_files, plots_root, target_lat, target_lon, 
             if os.path.exists(output_file):
                 continue
             
-            # Prepare boxplot data for first 5 days with outlier removal
+            # Prepare boxplot data for first 5 days (with outliers)
             boxplot_data_per_day = []
             lead_times_5days = []
             
             for lead in range(min(5, discharge_data.shape[2])):
                 data = discharge_data[t, :, lead]
                 lead_times_5days.append(lead_times_days[lead])
-                
-                # Remove outliers
-                q1 = np.nanpercentile(data, 25)
-                q3 = np.nanpercentile(data, 75)
-                iqr = q3 - q1
-                lower_bound = q1 - 1.5 * iqr
-                upper_bound = q3 + 1.5 * iqr
-                filtered_data = data[(data >= lower_bound) & (data <= upper_bound)]
-                boxplot_data_per_day.append(filtered_data)
+                boxplot_data_per_day.append(data)
             
             # Create plot
             plt.figure(figsize=(12, 7))
             
-            # Plot boxplots only
+            # Plot boxplots with outliers
             plt.boxplot(boxplot_data_per_day, positions=lead_times_5days, widths=0.4, 
-                       patch_artist=True, showfliers=False,
+                       patch_artist=True, showfliers=True,
                        boxprops=dict(facecolor="lightblue", alpha=0.7),
                        medianprops=dict(color="black", linewidth=1.5))
             
             # Add threshold lines based on country
             if threshold_type == "guatemala":
                 plt.axhline(threshold1, color='red', linestyle='--', linewidth=2, label='2-year RP', alpha=0.7)
-                plt.axhline(threshold2, color='orange', linestyle='-.', linewidth=2, label='3-year RP', alpha=0.7)
+                if threshold2 is not None:
+                    plt.axhline(threshold2, color='orange', linestyle='-.', linewidth=2, label='3-year RP', alpha=0.7)
             elif threshold_type == "philippines":
-                plt.axhline(threshold1, color='red', linestyle='--', linewidth=2, label='5-year RP', alpha=0.7)
+                plt.axhline(threshold1, color='red', linestyle='--', linewidth=2, label='2-year RP', alpha=0.7)
+                if threshold2 is not None:
+                    plt.axhline(threshold2, color='orange', linestyle='-.', linewidth=2, label='5-year RP', alpha=0.7)
             
             plt.xlabel("Lead Time (days)", fontsize=14)
             plt.ylabel("River Discharge (m³/s)", fontsize=14)
             
             if basin_code:
-                title = f"GloFAS Ensemble Forecast Hydrograph (Outliers Removed)\n{config['name']} - {config['station_name']}\nLat: {ds.latitude.values[ilat]:.2f}°, Lon: {ds.longitude.values[ilon]:.2f}°"
+                title = f"GloFAS Ensemble Forecast Hydrograph\n{config['name']} - {config['station_name']}\nLat: {ds.latitude.values[ilat]:.2f}°, Lon: {ds.longitude.values[ilon]:.2f}°"
             else:
-                title = f"GloFAS Ensemble Forecast Hydrograph (Outliers Removed)\n{config['name']} Region\nLat: {ds.latitude.values[ilat]:.2f}°, Lon: {ds.longitude.values[ilon]:.2f}°"
+                title = f"GloFAS Ensemble Forecast Hydrograph\n{config['name']} Region\nLat: {ds.latitude.values[ilat]:.2f}°, Lon: {ds.longitude.values[ilon]:.2f}°"
             
             plt.title(title, fontsize=14, fontweight="bold")
             plt.grid(True, alpha=0.3)
