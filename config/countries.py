@@ -3,18 +3,49 @@ COUNTRIES = {
     "guatemala": {
         "name": "Guatemala",
         "bbox": [17.82, -92.23, 13.73, -88.23],  # [north, west, south, east]
-        "river_coords": {
-            "lat": 14.211,
-            "lon": -90.341
-        },
-        "lisflood_coords": {
-            "lat": 14.225,
-            "lon": -90.325
+        "river_basins": {
+            "dulce": {
+                "name": "Rio Dulce Basin",
+                "station_name": "Rio Dulce",
+                "station_id": "G2394",
+                "point_id": "SI001489",
+                "river": "Dulce",
+                "basin": "Coastal",
+                "river_coords": {
+                    "lat": 15.655,  # Original coordinates
+                    "lon": -88.998
+                },
+                "lisflood_coords": {
+                    "lat": 15.625,  # LISFLOOD coordinates
+                    "lon": -88.975
+                },
+                "drainage_area_km2": 7513,  # LISFLOOD drainage area
+                "provinces": ["Izabal"]
+            },
+            "los_esclavos": {
+                "name": "Los Esclavos River Basin",
+                "station_name": "Plan De Avila",
+                "station_id": "G2379",
+                "point_id": "SI001583",
+                "river": "Los Esclavos",
+                "basin": "Coastal",
+                "river_coords": {
+                    "lat": 14.211,  # Original coordinates
+                    "lon": -90.341
+                },
+                "lisflood_coords": {
+                    "lat": 14.225,  # LISFLOOD coordinates
+                    "lon": -90.325
+                },
+                "drainage_area_km2": 1193,  # LISFLOOD drainage area
+                "provinces": ["Suchitepequez", "Retalhuleu"]
+            }
         },
         "trigger": {
             "return_period": 3.0,  # 3-year return period
             "probability_threshold": 0.5,  # 50% probability
-            "lead_time_days": 3
+            "lead_time_days": 3,
+            "activation_rule": "ANY_BASIN"  # Activate if ANY basin meets threshold
         }
     },
     "philippines": {
