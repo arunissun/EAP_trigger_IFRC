@@ -24,10 +24,15 @@ def download_country_data(country_code):
 
     area = country_config["bbox"]
     dataset = "cems-glofas-forecast"
-    year = "2025"
-    month = "10"
+    
+    # Automatically get current year and month
     today = datetime.now()
+    year = str(today.year)
+    month = f"{today.month:02d}"
     n_days = today.day
+    
+    print(f"Downloading data for {country_config['name']}: {year}-{month} (Days 1-{n_days})")
+    
     leadtime_hours = [str(h) for h in range(24, 241, 24)]
 
     requests = []
