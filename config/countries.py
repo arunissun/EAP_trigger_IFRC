@@ -61,8 +61,8 @@ COUNTRIES = {
                     "lon": 121.688
                 },
                 "lisflood_coords": {
-                    "lat": 17.614,
-                    "lon": 121.688
+                    "lat": 17.625,
+                    "lon": 121.675
                 },
                 "drainage_area_km2": 19910,
                 "provinces": ["Cagayan", "Isabela"]
