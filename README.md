@@ -9,7 +9,183 @@ This repository contains a complete automated pipeline that:
 1. **Downloads** daily GloFAS ensemble forecast data from Copernicus Climate Data Store
 2. **Merges** GRIB2 files into monthly NetCDF files
 3. **Generates** hydrograph plots with flood threshold overlays
-4. **Commits** results back to the repository
+4. **Analyzes** forecasts against return period thresholds to identify flood triggers
+5. **Sends** automated email alerts when high-risk conditions are detected
+6. **Commits** results back to the repository
+
+Key features:
+- **Multi-country support** (Guatemala, Philippines, etc.)
+- **Configurable river basins** with custom coordinates and thresholds
+- **Automated daily downloads** via GitHub Actions
+- **Return period threshold analysis** (2-year and 5-year)
+- **Professional hydrograph plots** with threshold visualization
+- **Automated email alerts** with IFRC branding for high-risk forecasts
+
+## Pipeline Process Flow
+
+The complete pipeline consists of five main stages:
+
+### 1. Data Download (`download_glofas.py`)
+Downloads GloFAS ensemble forecast data from the Copernicus Climate Data Store.
+
+**What it does:**
+- Connects to CDS API using credentials from `~/.cdsapirc`
+- Downloads 30-day ensemble forecasts (51 ensemble members)
+- Retrieves data for configured country bounding boxes
+- Saves daily GRIB2 files to `data/{country}/ensemble_forecast/`
+- Automatically handles multiple countries in a single run
+
+**Output:** Daily GRIB2 files named `glofas_{country}_ensemble_{YYYY}_{MM}_{DD}.grib2`
+
+**Usage:**
+```bash
+python scripts/download_glofas.py
+```
+
+### 2. Data Merging (`merge_grib_to_nc.py`)
+Merges daily GRIB2 files into monthly NetCDF files for efficient analysis.
+
+**What it does:**
+- Reads all GRIB2 files for a given month
+- Combines ensemble forecasts into single NetCDF file
+- Organizes data by forecast date and step
+- Compresses and optimizes for storage
+- Processes multiple months if specified
+
+**Output:** Monthly NetCDF files named `glofas_{country}_ensemble_{YYYY}_{MM}_combined.nc`
+
+**Usage:**
+```bash
+python scripts/merge_grib_to_nc.py
+```
+
+### 3. Visualization (`plot_hydrographs.py`)
+Creates hydrograph plots showing ensemble forecasts against return period thresholds.
+
+**What it does:**
+- Extracts forecast data at configured river coordinates
+- Calculates ensemble statistics (median, percentiles)
+- Loads 2-year and 5-year return period thresholds
+- Generates professional plots with IFRC branding
+- Creates separate plots for each basin (multi-basin countries)
+- Organizes plots by year/month subdirectories
+
+**Output:** PNG plots saved to `data/{country}/plots/{basin}/{YYYY}_{MM}/hydrograph_{YYYY}-{MM}-{DD}.png`
+
+**Features:**
+- Box plots showing ensemble spread
+- Red dashed line: 2-year return period threshold
+- Orange dash-dot line: 5-year return period threshold
+- Median ensemble forecast line
+- 30-day forecast horizon
+
+**Usage:**
+```bash
+python scripts/plot_hydrographs.py
+```
+
+### 4. Flood Trigger Analysis (`analyze_flood_triggers.py`)
+Analyzes forecasts to identify flood triggers based on exceedance probabilities.
+
+**What it does:**
+- Calculates probability of exceeding return period thresholds
+- Compares probabilities against configured trigger levels
+- Determines alert status (low, medium, high)
+- Generates narrative analysis with risk assessments
+- Creates Excel files with detailed trigger data
+- Processes all basins for multi-basin countries
+
+**Alert Status Logic:**
+- **High Alert**: Probability > 70% of exceeding threshold
+- **Medium Alert**: Probability between 50-70%
+- **Low Alert**: Probability < 50%
+
+**Output:** Excel files saved to `data/{country}/analysis/{basin}/trigger_analysis_{YYYY}_{MM}_{DD}.xlsx`
+
+**Excel Contents:**
+- Forecast date and step
+- Return period probabilities
+- Alert status
+- Lead time
+- Affected provinces (if configured)
+- Narrative risk analysis
+
+**Usage:**
+```bash
+python scripts/analyze_flood_triggers.py
+```
+
+### 5. Email Alert System (Jupyter Notebook)
+Monitors trigger analysis and sends automated email alerts for high-risk forecasts.
+
+**Deployment:** This pipeline is deployed on **Microsoft Fabric** as Jupyter notebooks, enabling cloud-based execution with integrated data storage and parameter management.
+
+**What it does:**
+- Scans Excel files for latest forecast data
+- Filters for high alert status on most recent forecasts
+- Generates professional HTML emails with IFRC branding
+- Embeds hydrograph plots as inline images
+- Attaches full Excel analysis files
+- Sends via Gmail SMTP with secure authentication
+
+**Alert Trigger Logic:**
+- Groups data by station/basin
+- Sorts by forecast date to find latest forecast
+- Only sends alerts if latest forecast shows "high" alert_status
+- Prevents alerts for old forecasts
+
+**Email Features:**
+- IFRC GO logo from CDN
+- Table-based HTML (compatible with Outlook Desktop)
+- Embedded hydrograph images
+- Risk-based narrative recommendations
+- Excel file attachments with full analysis
+- Professional formatting across all email clients
+
+**Configuration (Fabric Notebook Parameters):**
+- `SENDER_EMAIL`: Gmail address (e.g., `your.email@gmail.com`)
+- `SENDER_PASSWORD`: Gmail App Password (16-character code)
+- `RECIPIENT_EMAIL`: Alert recipient address
+- `SMTP_SERVER`: `smtp.gmail.com`
+- `SMTP_PORT`: `587`
+
+**Setup Requirements:**
+1. Enable 2-Step Verification on Gmail account
+2. Generate App Password at https://myaccount.google.com/apppasswords
+3. Configure Fabric notebook parameters with credentials
+4. Run notebook in Microsoft Fabric environment
+
+**Usage:**
+Run the Jupyter notebook cells sequentially in Microsoft Fabric to send alerts.
+
+## Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         GLOFAS EAP PIPELINE                         │
+└─────────────────────────────────────────────────────────────────────┘
+
+1. DOWNLOAD (download_glofas.py)
+   ├─> Copernicus CDS API
+   └─> data/{country}/ensemble_forecast/*.grib2
+
+2. MERGE (merge_grib_to_nc.py)
+   ├─> Read: data/{country}/ensemble_forecast/*.grib2
+   └─> Write: data/{country}/ensemble_forecast/*_combined.nc
+
+3. PLOT (plot_hydrographs.py)
+   ├─> Read: *_combined.nc + return_periods/*.nc
+   └─> Write: data/{country}/plots/{basin}/{year_month}/*.png
+
+4. ANALYZE (analyze_flood_triggers.py)
+   ├─> Read: *_combined.nc + return_periods/*.nc
+   └─> Write: data/{country}/analysis/{basin}/*.xlsx
+
+5. ALERT (Jupyter Notebook in Fabric)
+   ├─> Read: data/{country}/analysis/{basin}/*.xlsx
+   ├─> Attach: data/{country}/plots/{basin}/{year_month}/*.png
+   └─> Send: Email via Gmail SMTP
+```
 
 ## Repository Structure
 
