@@ -6,7 +6,7 @@ Automated pipeline for downloading, processing, and visualizing GloFAS (Global F
 
 This repository contains a complete automated pipeline that:
 
-1. **Downloads** daily GloFAS ensemble forecast data from Copernicus Climate Data Store
+1. **Downloads** daily GloFAS ensemble forecast data from Copernicus Early Warning Data Store (EWDS)
 2. **Merges** GRIB2 files into monthly NetCDF files
 3. **Generates** hydrograph plots with flood threshold overlays
 4. **Analyzes** forecasts against return period thresholds to identify flood triggers
