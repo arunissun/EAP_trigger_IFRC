@@ -26,7 +26,7 @@ Key features:
 The complete pipeline consists of five main stages:
 
 ### 1. Data Download (`download_glofas.py`)
-Downloads GloFAS ensemble forecast data from the Copernicus Climate Data Store.
+Downloads GloFAS ensemble forecast data from the Copernicus Early Warning Data Store (EWDS).
 
 **What it does:**
 - Connects to EWDS API using credentials from `~/.cdsapirc`
