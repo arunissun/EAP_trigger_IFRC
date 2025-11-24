@@ -115,7 +115,7 @@ Analyzes forecasts to identify flood triggers based on exceedance probabilities.
 python scripts/analyze_flood_triggers.py
 ```
 
-### 5. Email Alert System (Jupyter Notebook)
+### 5. Email Alert System 
 Monitors trigger analysis and sends automated email alerts for high-risk forecasts.
 
 **Deployment:** This pipeline is deployed on **Microsoft Fabric** as Jupyter notebooks, enabling cloud-based execution with integrated data storage and parameter management.
@@ -181,7 +181,7 @@ Run the Jupyter notebook cells sequentially in Microsoft Fabric to send alerts.
    ├─> Read: *_combined.nc + return_periods/*.nc
    └─> Write: data/{country}/analysis/{basin}/*.xlsx
 
-5. ALERT (Jupyter Notebook in Fabric)
+5. ALERT 
    ├─> Read: data/{country}/analysis/{basin}/*.xlsx
    ├─> Attach: data/{country}/plots/{basin}/{year_month}/*.png
    └─> Send: Email via Gmail SMTP
@@ -235,19 +235,62 @@ Run the Jupyter notebook cells sequentially in Microsoft Fabric to send alerts.
    pip install -r requirements.txt
    ```
 
-3. **Configure CDS API credentials:**
+3. **Configure EWDS API credentials:**
    Create `~/.cdsapirc` with your credentials:
    ```
-   url: https://cds.climate.copernicus.eu/api/v2
+   url: https://ewds.climate.copernicus.eu/api
    key: YOUR_UID:YOUR_API_KEY
    ```
 
-4. **Run the pipeline:**
-   ```bash
-   python scripts/download_glofas.py
-   python scripts/merge_grib_to_nc.py
-   python scripts/plot_hydrographs.py
-   ```
+4. **Run Pipeline Script (`run_pipeline.py`)**
+
+The `run_pipeline.py` script orchestrates the complete flood forecasting pipeline by running all stages in the correct sequence. It provides:
+
+**Features:**
+- Runs all 4 stages automatically in order
+- Validates that each script exists before execution
+- Displays progress for each stage (Stage 1/4, Stage 2/4, etc.)
+- Stops gracefully if any stage fails and reports which stage failed
+- Shows start and completion timestamps
+- Returns appropriate exit codes for automation/scheduling
+
+**Output Example:**
+```
+======================================================================
+  GloFAS EAP PIPELINE ORCHESTRATOR
+======================================================================
+
+Pipeline Overview:
+  1. Download GloFAS Data
+  2. Merge GRIB to NetCDF
+  3. Plot Hydrographs
+  4. Analyze Flood Triggers
+
+Starting: 2025-11-24 10:30:45
+
+Stage 1/4: Download GloFAS Data
+Stage 1 completed successfully!
+
+Stage 2/4: Merge GRIB to NetCDF
+Stage 2 completed successfully!
+
+[continues for remaining stages...]
+
+======================================================================
+  PIPELINE COMPLETED SUCCESSFULLY
+======================================================================
+All 4 stages completed successfully
+Completion: 2025-11-24 10:35:12
+```
+
+**Usage:**
+```bash
+python scripts/run_pipeline.py
+```
+
+**Exit Codes:**
+- `0`: All stages completed successfully
+- `1`: Pipeline failed at one of the stages
 
 ### Crop Return Periods Script
 
