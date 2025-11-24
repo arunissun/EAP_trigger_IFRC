@@ -29,7 +29,7 @@ The complete pipeline consists of five main stages:
 Downloads GloFAS ensemble forecast data from the Copernicus Climate Data Store.
 
 **What it does:**
-- Connects to CDS API using credentials from `~/.cdsapirc`
+- Connects to EWDS API using credentials from `~/.cdsapirc`
 - Downloads 30-day ensemble forecasts (51 ensemble members)
 - Retrieves data for configured country bounding boxes
 - Saves daily GRIB2 files to `data/{country}/ensemble_forecast/`
