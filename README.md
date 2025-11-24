@@ -420,4 +420,4 @@ This project is part of IFRC's emergency response systems.
 
 ## Contact
 
-For questions or issues, please contact the repository maintainer.
+For questions or issues, please contact the repository maintainer at arun.gandhi@ifrc.org
