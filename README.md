@@ -210,6 +210,7 @@ Run the Jupyter notebook cells sequentially in Microsoft Fabric to send alerts.
 │   ├── download_glofas.py            # Data download script
 │   ├── merge_grib_to_nc.py           # GRIB to NetCDF conversion
 │   └── plot_hydrographs.py           # Plot generation
+|   └── run_pipeline.py               # run the pipeline
 ├── requirements.txt                  # Python dependencies
 └── .gitignore                        # Git ignore rules
 ```
